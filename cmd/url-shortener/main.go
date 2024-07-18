@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/northwindman/url-shortener-API-service/internal/config"
 	mwLogger "github.com/northwindman/url-shortener-API-service/internal/http-server/middleware/logger"
+	"github.com/northwindman/url-shortener-API-service/internal/lib/logger/handlers/slogpretty"
 	"github.com/northwindman/url-shortener-API-service/internal/lib/logger/sl"
 	"github.com/northwindman/url-shortener-API-service/internal/storage/sqlite"
 	"log/slog"
@@ -31,6 +32,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	_ = storage
+
+	log.Debug("starting http server in Debug mode")
+
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID)
@@ -48,10 +53,7 @@ func setupLogger(env string) *slog.Logger {
 
 	switch env {
 	case envLocal:
-		log = slog.New(
-			slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
-		)
-
+		log = setupPrettySlog()
 	case envDev:
 		log = slog.New(
 			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
@@ -64,4 +66,16 @@ func setupLogger(env string) *slog.Logger {
 	}
 
 	return log
+}
+
+func setupPrettySlog() *slog.Logger {
+	opts := slogpretty.PrettyHandlerOptions{
+		SlogOpts: &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
+	}
+
+	handler := opts.NewPrettyHandler(os.Stdout)
+
+	return slog.New(handler)
 }
