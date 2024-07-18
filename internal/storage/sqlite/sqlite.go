@@ -2,8 +2,9 @@ package sqlite
 
 import (
 	"database/sql"
-	_ "errors"
-	_ "github.com/mattn/go-sqlite3"
+	"errors"
+	"github.com/mattn/go-sqlite3"
+	"github.com/northwindman/url-shortener-API-service/internal/storage"
 	"github.com/northwindman/url-shortener-API-service/pkg/lib/e"
 )
 
@@ -37,4 +38,70 @@ func New(storagePath string) (*Storage, error) {
 	}
 
 	return &Storage{db: db}, nil
+}
+
+func (s *Storage) SaveURL(urlToSave string, alias string) (int64, error) {
+	const op = "storage.sqlite.SaveURL"
+
+	stmt, err := s.db.Prepare("INSERT INTO url (url, alias) VALUES (?, ?)")
+	if err != nil {
+		return 0, e.Wrap(op, err)
+	}
+
+	res, err := stmt.Exec(urlToSave, alias)
+	if err != nil {
+		if sqliteErr, ok := err.(sqlite3.Error); ok && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+			return 0, e.Wrap(op, storage.ErrURLExists)
+		}
+
+		return 0, e.Wrap(op, err)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, e.Wrap(op+"failed to get last insert id: ", err)
+	}
+
+	return id, nil
+}
+
+func (s *Storage) GetURL(alias string) (string, error) {
+	const op = "storage.sqlite.GetURL"
+
+	stmt, err := s.db.Prepare("SELECT url FROM url WHERE alias = ?")
+	if err != nil {
+		return "", e.Wrap(op, err)
+	}
+
+	var url string
+	err = stmt.QueryRow(alias).Scan(&url)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", e.Wrap(op, storage.ErrURLNotFound)
+		}
+
+		return "", e.Wrap(op, err)
+	}
+
+	return url, nil
+}
+
+func (s *Storage) DeleteURL(alias string) error {
+	const op = "storage.sqlite.DeleteURL"
+
+	stmt, err := s.db.Prepare("DELETE FROM url WHERE alias = ?")
+	if err != nil {
+		return e.Wrap(op, err)
+	}
+
+	_, err = stmt.Exec(alias)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return e.Wrap(op, storage.ErrURLNotFound)
+		}
+
+		return e.Wrap(op, err)
+	}
+
+	return nil
 }
