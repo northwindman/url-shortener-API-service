@@ -22,7 +22,7 @@ type HTTPServer struct {
 func MustLoad() *Config {
 	configPath := os.Getenv("CONFIG_FILE")
 	if configPath == "" {
-		log.Fatal("CONFIG_PATH environment variable not set")
+		log.Fatal("CONFIG_FILE environment variable not set")
 	}
 
 	//check if file exist

@@ -4,11 +4,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/northwindman/url-shortener-API-service/internal/config"
+	"github.com/northwindman/url-shortener-API-service/internal/http-server/handlers/url/save"
 	mwLogger "github.com/northwindman/url-shortener-API-service/internal/http-server/middleware/logger"
 	"github.com/northwindman/url-shortener-API-service/internal/lib/logger/handlers/slogpretty"
 	"github.com/northwindman/url-shortener-API-service/internal/lib/logger/sl"
 	"github.com/northwindman/url-shortener-API-service/internal/storage/sqlite"
 	"log/slog"
+	"net/http"
 	"os"
 )
 
@@ -43,6 +45,24 @@ func main() {
 	router.Use(mwLogger.New(log))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
+
+	router.Post("/url", save.New(log, storage))
+
+	log.Info("starting http server", slog.String("address", cfg.Address))
+
+	srv := &http.Server{
+		Addr:         cfg.Address,
+		Handler:      router,
+		ReadTimeout:  cfg.HTTPServer.Timeout,
+		WriteTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("failed to start http server", sl.Err(err))
+	}
+
+	log.Error("stopping http server")
 
 	//TODO: run server:
 
